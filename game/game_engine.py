@@ -1,4 +1,5 @@
 import pygame
+from .sound import SoundManager
 from .marble import Marble
 from .wall import Wall
 
@@ -29,6 +30,7 @@ class GameEngine:
         self.walls = self._build_maze()
         self.goal_x, self.goal_y, self.goal_radius = width - 60, height - 60, 22
 
+        self.sounds = SoundManager()
         self.difficulty = "Medium"
         self.start_round(self.difficulty)
 
@@ -96,6 +98,7 @@ class GameEngine:
         if elapsed >= self.time_limit_ms:
             self.game_over = True
             self.result = "timeout"
+            self.sounds.play_timeout()
             return
 
         self.marble.vx *= (1 - self.friction)
@@ -118,6 +121,7 @@ class GameEngine:
             self.game_over = True
             self.result = "solved"
             self.finish_time_ms = elapsed
+            self.sounds.play_win()
 
     def _resolve_wall_collisions(self):
         radius = self.marble.radius
@@ -160,6 +164,9 @@ class GameEngine:
 
             velocity_along_normal = self.marble.vx * nx + self.marble.vy * ny
             if velocity_along_normal < 0:
+                impact = -velocity_along_normal
+                if impact > 1.5:
+                    self.sounds.play_bounce(impact)
                 restitution = 0.3
                 self.marble.vx -= (1 + restitution) * velocity_along_normal * nx
                 self.marble.vy -= (1 + restitution) * velocity_along_normal * ny
