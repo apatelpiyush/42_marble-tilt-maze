@@ -8,6 +8,7 @@ WHITE = (255, 255, 255)
 DARK = (40, 40, 50)
 WALL_COLOR = (90, 90, 110)
 GOAL_COLOR = (60, 200, 120)
+RED = (220, 70, 70)
 
 class GameEngine:
     def __init__(self, width, height):
@@ -26,6 +27,8 @@ class GameEngine:
         self.start_ticks = pygame.time.get_ticks()
 
         self.font = pygame.font.SysFont("Arial", 26)
+        self.title_font = pygame.font.SysFont("Arial", 52, bold=True)
+        self.small_font = pygame.font.SysFont("Arial", 24)
         self.game_over = False
         self.result = None  # "solved" or "timeout"
         self.finish_time_ms = None
@@ -48,9 +51,8 @@ class GameEngine:
         return walls
 
     def handle_event(self, event):
-        # This game is driven entirely by the continuous mouse
-        # position, handled in handle_input each frame.
-        pass
+        if self.game_over and event.type == pygame.KEYDOWN:
+            pygame.event.post(pygame.event.Event(pygame.QUIT))
 
     def handle_input(self):
         if self.game_over:
@@ -150,15 +152,37 @@ class GameEngine:
         pygame.draw.circle(screen, GOAL_COLOR, (self.goal_x, self.goal_y), self.goal_radius)
         pygame.draw.circle(screen, WHITE, (int(self.marble.x), int(self.marble.y)), self.marble.radius)
 
-        elapsed = pygame.time.get_ticks() - self.start_ticks
+        if self.result == "solved":
+            elapsed = self.finish_time_ms
+        else:
+            elapsed = pygame.time.get_ticks() - self.start_ticks
         seconds_left = max(0, (self.time_limit_ms - elapsed) // 1000)
         timer_text = self.font.render(f"Time: {seconds_left}s", True, WHITE)
         screen.blit(timer_text, (10, 10))
 
-        if self.game_over and not getattr(self, "_game_over_logged", False):
-            # NOTE: no proper end screen yet - see Task 2 in the README.
-            if self.result == "solved":
-                print(f"Solved! Finished in {self.finish_time_ms / 1000:.1f}s")
-            else:
-                print("Time's up! Maze not solved.")
-            self._game_over_logged = True
+        if self.game_over:
+            self._render_end_screen(screen)
+
+    def _render_end_screen(self, screen):
+        overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 170))
+        screen.blit(overlay, (0, 0))
+
+        if self.result == "solved":
+            title = "Maze Solved!"
+            title_color = GOAL_COLOR
+            detail = f"Finish time: {self.finish_time_ms / 1000:.1f}s"
+        else:
+            title = "Time's Up!"
+            title_color = RED
+            detail = "The maze was not solved."
+
+        title_surf = self.title_font.render(title, True, title_color)
+        detail_surf = self.font.render(detail, True, WHITE)
+        prompt_surf = self.small_font.render("Press any key to exit", True, WHITE)
+
+        cx = self.width // 2
+        cy = self.height // 2
+        screen.blit(title_surf, title_surf.get_rect(center=(cx, cy - 50)))
+        screen.blit(detail_surf, detail_surf.get_rect(center=(cx, cy + 10)))
+        screen.blit(prompt_surf, prompt_surf.get_rect(center=(cx, cy + 70)))
