@@ -10,27 +10,39 @@ WALL_COLOR = (90, 90, 110)
 GOAL_COLOR = (60, 200, 120)
 RED = (220, 70, 70)
 
+DIFFICULTIES = {
+    "Easy": {"tilt": 0.45, "friction": 0.04, "time_ms": 60000},
+    "Medium": {"tilt": 0.6, "friction": 0.02, "time_ms": 45000},
+    "Hard": {"tilt": 0.8, "friction": 0.01, "time_ms": 30000},
+}
+
 class GameEngine:
     def __init__(self, width, height):
         self.width = width
         self.height = height
 
-        self.marble = Marble(50, 50)
-        self.tilt_strength = 0.6
-        self.friction = 0.02
-        self.max_speed = 9
-
-        self.walls = self._build_maze()
-        self.goal_x, self.goal_y, self.goal_radius = width - 60, height - 60, 22
-
-        self.time_limit_ms = 45000
-        self.start_ticks = pygame.time.get_ticks()
-
         self.font = pygame.font.SysFont("Arial", 26)
         self.title_font = pygame.font.SysFont("Arial", 52, bold=True)
         self.small_font = pygame.font.SysFont("Arial", 24)
+
+        self.max_speed = 9
+        self.walls = self._build_maze()
+        self.goal_x, self.goal_y, self.goal_radius = width - 60, height - 60, 22
+
+        self.difficulty = "Medium"
+        self.start_round(self.difficulty)
+
+    def start_round(self, difficulty):
+        settings = DIFFICULTIES[difficulty]
+        self.difficulty = difficulty
+        self.tilt_strength = settings["tilt"]
+        self.friction = settings["friction"]
+        self.time_limit_ms = settings["time_ms"]
+
+        self.marble = Marble(50, 50)
+        self.start_ticks = pygame.time.get_ticks()
         self.game_over = False
-        self.result = None  # "solved" or "timeout"
+        self.result = None
         self.finish_time_ms = None
 
     def _build_maze(self):
@@ -51,7 +63,16 @@ class GameEngine:
         return walls
 
     def handle_event(self, event):
-        if self.game_over and event.type == pygame.KEYDOWN:
+        if not self.game_over or event.type != pygame.KEYDOWN:
+            return
+
+        if event.key == pygame.K_1:
+            self.start_round("Easy")
+        elif event.key == pygame.K_2:
+            self.start_round("Medium")
+        elif event.key == pygame.K_3:
+            self.start_round("Hard")
+        elif event.key in (pygame.K_ESCAPE, pygame.K_q):
             pygame.event.post(pygame.event.Event(pygame.QUIT))
 
     def handle_input(self):
@@ -171,18 +192,20 @@ class GameEngine:
         if self.result == "solved":
             title = "Maze Solved!"
             title_color = GOAL_COLOR
-            detail = f"Finish time: {self.finish_time_ms / 1000:.1f}s"
+            detail = f"Finish time: {self.finish_time_ms / 1000:.1f}s ({self.difficulty})"
         else:
             title = "Time's Up!"
             title_color = RED
-            detail = "The maze was not solved."
+            detail = f"The maze was not solved ({self.difficulty})."
 
         title_surf = self.title_font.render(title, True, title_color)
         detail_surf = self.font.render(detail, True, WHITE)
-        prompt_surf = self.small_font.render("Press any key to exit", True, WHITE)
+        play_surf = self.small_font.render("Play again:  1 Easy   2 Medium   3 Hard", True, WHITE)
+        exit_surf = self.small_font.render("Esc or Q to exit", True, WHITE)
 
         cx = self.width // 2
         cy = self.height // 2
-        screen.blit(title_surf, title_surf.get_rect(center=(cx, cy - 50)))
-        screen.blit(detail_surf, detail_surf.get_rect(center=(cx, cy + 10)))
-        screen.blit(prompt_surf, prompt_surf.get_rect(center=(cx, cy + 70)))
+        screen.blit(title_surf, title_surf.get_rect(center=(cx, cy - 70)))
+        screen.blit(detail_surf, detail_surf.get_rect(center=(cx, cy - 15)))
+        screen.blit(play_surf, play_surf.get_rect(center=(cx, cy + 50)))
+        screen.blit(exit_surf, exit_surf.get_rect(center=(cx, cy + 90)))
