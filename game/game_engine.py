@@ -97,34 +97,49 @@ class GameEngine:
             self.finish_time_ms = elapsed
 
     def _resolve_wall_collisions(self):
+        radius = self.marble.radius
         for wall in self.walls:
-            marble_rect = self.marble.rect()
             wall_rect = wall.rect()
 
-            # NOTE: this checks a simple bounding-box overlap
-            # (colliderect) between the marble's square bounding box
-            # and the wall, instead of a true circle-vs-rectangle
-            # distance test. Near a wall's corner, the marble's
-            # bounding square can overlap the wall rect well before
-            # the actual round marble visually touches it, causing an
-            # early "phantom" bounce off empty space right next to
-            # corners. See Task 1 in the README.
-            if marble_rect.colliderect(wall_rect):
-                overlap_x = min(marble_rect.right, wall_rect.right) - max(marble_rect.left, wall_rect.left)
-                overlap_y = min(marble_rect.bottom, wall_rect.bottom) - max(marble_rect.top, wall_rect.top)
+            closest_x = max(wall_rect.left, min(self.marble.x, wall_rect.right))
+            closest_y = max(wall_rect.top, min(self.marble.y, wall_rect.bottom))
 
-                if overlap_x < overlap_y:
-                    if self.marble.x < wall_rect.centerx:
-                        self.marble.x -= overlap_x
-                    else:
-                        self.marble.x += overlap_x
-                    self.marble.vx *= -0.3
-                else:
-                    if self.marble.y < wall_rect.centery:
-                        self.marble.y -= overlap_y
-                    else:
-                        self.marble.y += overlap_y
-                    self.marble.vy *= -0.3
+            dx = self.marble.x - closest_x
+            dy = self.marble.y - closest_y
+            dist_sq = dx * dx + dy * dy
+
+            if dist_sq >= radius * radius:
+                continue
+
+            if dist_sq > 0:
+                dist = dist_sq ** 0.5
+                nx = dx / dist
+                ny = dy / dist
+                penetration = radius - dist
+            else:
+                gaps = {
+                    "left": self.marble.x - wall_rect.left,
+                    "right": wall_rect.right - self.marble.x,
+                    "top": self.marble.y - wall_rect.top,
+                    "bottom": wall_rect.bottom - self.marble.y,
+                }
+                side = min(gaps, key=gaps.get)
+                nx, ny = {
+                    "left": (-1, 0),
+                    "right": (1, 0),
+                    "top": (0, -1),
+                    "bottom": (0, 1),
+                }[side]
+                penetration = gaps[side] + radius
+
+            self.marble.x += nx * penetration
+            self.marble.y += ny * penetration
+
+            velocity_along_normal = self.marble.vx * nx + self.marble.vy * ny
+            if velocity_along_normal < 0:
+                restitution = 0.3
+                self.marble.vx -= (1 + restitution) * velocity_along_normal * nx
+                self.marble.vy -= (1 + restitution) * velocity_along_normal * ny
 
     def render(self, screen):
         screen.fill(DARK)
